@@ -1,33 +1,63 @@
+import random
 import math
 import random
 import unittest
 import networkx as nx
-from typing import List, Tuple
+from typing import List
+
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
 
 from tictactoe import TicTacToe
 
 
 class DepthFirstSearchAI(TicTacToe.Player):
 
+    def __init__(self, *args, **kwargs):
+        super(DepthFirstSearchAI, self).__init__(*args, **kwargs)
+        self.graph = nx.DiGraph()
+        self.best_moves = None
+
     def play(self) -> TicTacToe.Tile:
-        def best_move(tictactoe: TicTacToe, recursion_level: int=1) -> Tuple[int, TicTacToe.Tile]:
-            best_score, best_tile = -math.inf, None
+        tree = self.build_tree()
+        nx.nx_pydot.write_dot(tree, 'tree.dot')
+        nx.write_gexf(tree, 'tree.gexf')
+        nx.write_graphml(tree, 'tree.graphml')
+        pos = nx.nx_pydot.graphviz_layout(tree, prog='dot')
+        nx.draw(tree, pos=pos, with_labels=True, arrows=True)
+        plt.show()
+        # TODO Extract the best move
+        return random.choice(self.tictactoe.choices())
 
-            for tile in tictactoe.choices():
-                tictactoe.set(tile)
-                score = tictactoe.score(tile)
+    def build_tree(self) -> nx.DiGraph:
+        def expand_tree(tictactoe: TicTacToe, tree: nx.DiGraph, recursion_depth: int=1) -> nx.DiGraph:
+            parent, child = str(tictactoe), tictactoe
+
+            if recursion_depth > 2:
+                return
+
+            for tile in child.choices():
+                child.set(tile)
+                score = child.score(tile)
                 if score is None:
-                    opponent_score, opponent_tile = best_move(tictactoe, recursion_level + 1)
-                    score = -opponent_score
+                    tree.add_node(str(child), recursion_depth=recursion_depth)
+                    tree.add_edge(parent, str(child))
+                    expand_tree(child, tree, recursion_depth + 1)
                 else:
-                    score /= recursion_level
-                if score > best_score:
-                    best_score, best_tile = score, tile
-                tictactoe.unset(tile)
-            return best_score, best_tile
+                    tree.add_node(str(child), score=score, recursion_depth=recursion_depth)
+                    tree.add_edge(parent, str(child))
+                child.unset(tile)
 
-        best_score, best_tile = best_move(self.tictactoe)
-        return best_tile
+        tree = nx.DiGraph(name='DFSTree')
+        expand_tree(self.tictactoe, tree)
+        return tree
+
+    def reset(self):
+        pass
+
+    def visualize(self) -> bytes:
+        pass
 
 
 class MonteCarloTreeSearchAI(TicTacToe.Player):
